@@ -178,6 +178,7 @@ import {
 } from "./desktopOAuthDeepLink.js";
 import { handleSecondInstanceWorkspaceRequest } from "./desktopSecondInstanceDeepLink.js";
 import { installFinderOpenFolderWorkflow } from "./desktopFinderOpenFolderWorkflow.js";
+import { startConfiguredDesktopLanRemoteGateway } from "./desktopLanRemoteBootstrap.js";
 import { installWindowsOpenFolderContextMenu } from "./desktopWindowsOpenFolderContextMenu.js";
 import {
   createDeepLinkSingleInstanceData,
@@ -671,6 +672,8 @@ const UPDATE_STATUS_WINDOW_TRAFFIC_LIGHT_POSITION = { x: 10, y: 10 } as const;
 const mainSettingService = createSettingService();
 const appLaunchGate = createAppLaunchGate();
 const appLaunchCoordinator = createAppLaunchCoordinator(appLaunchGate);
+let desktopLanRemoteGateway: Awaited<ReturnType<typeof startConfiguredDesktopLanRemoteGateway>> =
+  null;
 const appTelemetryCredentialService = createCredentialService();
 async function resolveCurrentZCodeEndpointOrigin() {
   return resolveZCodeEndpointOrigin({
@@ -1026,6 +1029,8 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
   stopRemoteUsageArmsPeriodicSampling();
   disposeRendererActionTraceIpc?.();
   disposeRendererActionTraceIpc = undefined;
+  const lanRemoteGatewayToClose = desktopLanRemoteGateway;
+  desktopLanRemoteGateway = null;
   notifyStabilityAppExit(
     getStabilityLifecycleScene() === "update_install" ? "update_install" : "app_quit",
     logger,
@@ -1043,6 +1048,9 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
   );
 
   appQuitPreparationInFlight = Promise.all([
+    lanRemoteGatewayToClose?.close().catch((error) => {
+      logger.warn(`[lan-remote] shutdown failed (${reason})`, error);
+    }),
     // 退出屏障结束后再启动窗口尺寸写入，可能在 app.exit 前留下 setting.json.lock。
     // 尺寸已在 resize 防抖或最大化状态变化时保存，退出屏障不再创建新的尺寸写入。
     // 修复原因：Main 过去不会等待仍在发送的 /event/report，正常退出也会直接丢事件。
@@ -1883,6 +1891,24 @@ app.whenReady().then(async () => {
     reconcileKeepAwakeBlocker();
   } catch {
     // 读取失败不影响启动，使用默认 homedir
+  }
+
+  try {
+    desktopLanRemoteGateway = await startConfiguredDesktopLanRemoteGateway({
+      environment: process.env,
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      serverId: deviceMid,
+      serverName: `ZCode Desktop (${hostname()})`,
+      windowHostProcessMap,
+      windowWorkspaceMap,
+      listWindows: getApplicationWindowsExcludingCuaIndicator,
+      logger,
+    });
+  } catch (error) {
+    // 局域网远控是可选入口；端口占用或静态资源错误不能阻止 Desktop 启动。
+    logger.error("[lan-remote] gateway startup failed", error);
+    desktopLanRemoteGateway = null;
   }
 
   // scheduler 也会打开 tasks-index；等 Host 完成统一准备，避免在启动页出现前抢先迁移。

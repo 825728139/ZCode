@@ -375,12 +375,15 @@ async function resolveWebBootstrap(): Promise<WebBootstrapResult> {
     }
     const serverInfo = (await response.json()) as Partial<ServerRemoteInfo>;
     const workspace = Array.isArray(serverInfo.workspaces) ? serverInfo.workspaces[0] : undefined;
+    const desktopLanAttachment = serverInfo.capabilities?.desktopLanAttachment === true;
     return {
       wsUrl,
       ...(workspace?.path ? { initialWorkspaceAbsPath: workspace.path } : {}),
       ...(workspace?.workspaceIdentity
         ? { initialWorkspaceIdentity: workspace.workspaceIdentity }
         : {}),
+      ...(desktopLanAttachment ? { restoreSession: true } : {}),
+      ...(desktopLanAttachment ? { allowOpenWorkspace: false } : {}),
     };
   } catch {
     return { wsUrl };

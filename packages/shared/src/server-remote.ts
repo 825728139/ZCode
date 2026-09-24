@@ -20,6 +20,8 @@ export const serverRemoteInfoSchema = z.object({
     websocketRpc: z.literal(true),
     // 旧 Server 缺少新增 dynamic event，必须先声明能力再订阅，避免异常打进对端读循环。
     processResourceTelemetry: z.boolean().optional(),
+    // Desktop 局域网网关只允许进入已经打开的 workspace，Web 不得展示任意目录入口。
+    desktopLanAttachment: z.boolean().optional(),
   }),
 });
 
