@@ -1,0 +1,8 @@
+FROM node:24-bookworm-slim
+
+RUN npm install --global @openai/codex@0.138.0 \
+  && useradd --create-home --uid 10001 codex
+
+USER codex
+WORKDIR /workspace
+ENTRYPOINT ["codex"]

@@ -1,0 +1,25 @@
+[Unit]
+Description=Codex LAN Remote Gateway
+After=network-online.target podman.socket
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=codex-remote
+Group=codex-remote
+WorkingDirectory=/opt/zcode
+EnvironmentFile=/etc/codex-lan-remote.env
+Environment=XDG_DATA_HOME=/var/lib/codex-lan-remote/podman-data
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+ExecStart=/usr/bin/pnpm --filter @zcode/codex-lan-remote start
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+StateDirectory=codex-lan-remote
+ReadWritePaths=/var/lib/codex-lan-remote
+
+[Install]
+WantedBy=multi-user.target

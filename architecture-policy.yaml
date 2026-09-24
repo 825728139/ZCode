@@ -55,6 +55,14 @@ modules:
   - id: zcode-cli
     roots: [apps/zcode-cli]
     managed: false
+  - id: codex-lan-remote
+    roots: [apps/codex-lan-remote/src]
+    managed: true
+    requires: []
+    publicEntrypoints: [apps/codex-lan-remote/src/contract.ts]
+    layers: { domain: domain, app: app, adapters: adapters, ui: ui }
+    layerOrder: [domain, app, adapters, ui]
+    owner: codex-remote
 
 global:
   maxFileLines: 400
