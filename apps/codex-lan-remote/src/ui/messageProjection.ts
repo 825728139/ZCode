@@ -34,6 +34,40 @@ export function projectEvent(event: RemoteEvent): ProjectedMessage | null {
   }
   return null;
 }
+
+export function liveMessages(events: RemoteEvent[]): ProjectedMessage[] {
+  const snapshotIndex = events.findLastIndex((event) => event.type === "thread.snapshot");
+  const projected: ProjectedMessage[] = [];
+  const assistantItems = new Map<string, number>();
+  let anonymousAssistantIndex: number | null = null;
+
+  for (const event of events.slice(snapshotIndex + 1)) {
+    if (event.type === "codex.event" && event.method === "item/agentMessage/delta") {
+      const params = toRecord(event.params);
+      const delta = String(params.delta ?? "");
+      if (!delta) continue;
+      const itemId = typeof params.itemId === "string" ? params.itemId : null;
+      const existingIndex = itemId ? assistantItems.get(itemId) : anonymousAssistantIndex;
+      if (existingIndex !== undefined && existingIndex !== null) {
+        const current = projected[existingIndex];
+        if (current) projected[existingIndex] = { ...current, text: current.text + delta };
+      } else {
+        const index = projected.push({ role: "assistant", text: delta }) - 1;
+        if (itemId) assistantItems.set(itemId, index);
+        else anonymousAssistantIndex = index;
+      }
+      continue;
+    }
+
+    // 无 itemId 时只能合并真正相邻的 delta，避免把工具活动两侧的消息错误拼在一起。
+    anonymousAssistantIndex = null;
+    const message = projectEvent(event);
+    if (message) projected.push(message);
+  }
+
+  return projected;
+}
+
 function projectItem(value: unknown): ProjectedMessage | null {
   const item = toRecord(value);
   if (item.type === "userMessage") {

@@ -118,6 +118,19 @@ browser command
 9. Runtime 空闲超时后先拒绝新命令，等待 pending RPC 有界结束，再关闭 app-server。
    thread 与 rollout 由独立 `.codex` volume 保留，下次启动继续恢复。
 
+### 浏览器消息投影
+
+- `thread.snapshot` 是浏览器消息列表的完整基线；收到新快照后，只投影该快照之后的实时
+  事件，不能再次显示快照之前已经包含的 delta。
+- 同一个 assistant item 的 `item/agentMessage/delta` 必须按到达顺序拼接为一条消息。
+  item id 缺失时，只合并相邻的 assistant delta，不能跨越工具或 turn 状态事件合并。
+- `turn/started`、`turn/completed` 和工具活动保持独立状态行，不能拆散 assistant 正文。
+
+```text
+thread.snapshot -> turn/started -> delta(item A)* -> turn/completed
+      基线             状态          合并为一条            状态
+```
+
 ## HTTP 与 WebSocket 接口
 
 - `POST /api/auth/login`：登录并签发 session cookie。
@@ -181,6 +194,7 @@ JSON-RPC method。服务端只允许列举的 thread、turn 和审批操作，�
 9. `shared-host` 中 CLI 与浏览器连接同一 Unix socket；浏览器接管后续 turn，CLI 可重新
    附着并读取同一 thread，关闭任一客户端不会终止 owner。
 10. `shared-host` 的非 owner Web 用户无法枚举 thread、读取 socket 地址或升级 WebSocket。
+11. assistant 流式输出按 item 合并显示；连续中文 token 不逐字拆行，刷新快照后不重复正文。
 
 ## 后续边界
 

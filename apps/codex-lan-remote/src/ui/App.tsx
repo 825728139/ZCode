@@ -24,8 +24,7 @@ import { AccountSettings } from "./components/AccountSettings.js";
 import { Login } from "./components/Login.js";
 import {
   commandId,
-  type ProjectedMessage,
-  projectEvent,
+  liveMessages,
   snapshotMessages,
   type ThreadRecord,
   threadRows,
@@ -97,12 +96,7 @@ export function App() {
   }, [socket.events]);
 
   const visibleMessages = useMemo(
-    () => [
-      ...snapshotMessages(socket.events),
-      ...socket.events
-        .map(projectEvent)
-        .filter((value): value is ProjectedMessage => Boolean(value)),
-    ],
+    () => [...snapshotMessages(socket.events), ...liveMessages(socket.events)],
     [socket.events],
   );
   const approvals = socket.events.filter((event) => event.type === "approval.requested") as Extract<
